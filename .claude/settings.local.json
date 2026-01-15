@@ -3,7 +3,15 @@
     "allow": [
       "Bash(git restore:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(for file in scripts1.js scripts2.js scripts3.js scripts4.js scripts5.js scripts6.js scripts7.js scripts8.js scripts9.js scripts10.js scripts11.js scripts12.js)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(git log:*)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== scripts$i.js ===\")",
+      "Bash(xargs -I {} sh -c \"git show {}:scripts$i.js 2>/dev/null | grep ''MATCH''\")"
     ]
   }
 }
