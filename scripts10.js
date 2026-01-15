@@ -81,8 +81,10 @@ function main(config) {
     proxyGroups.push({
       name: airportName,
       icon: `${ICON_BASE}Airport.png`,
-      type: "select",
-      proxies: proxies
+      type: "url-test",
+      proxies: proxies,
+      interval: 300,
+      tolerance: 50
     });
   }
 
