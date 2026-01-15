@@ -2,35 +2,54 @@ function main(config) {
   const ICON_BASE = "https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/";
   const RULE_BASE = "https://cdn.jsdelivr.net/gh/ACL4SSR/ACL4SSR@master/Clash/";
 
-  const originalProxies = config.proxies || [];
+  function normalizeName(name = '') {
+    return String(name)
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/[【】[\]（）()]/g, '')
+      .replace(/🇺🇸/g, 'US')
+      .replace(/🇯🇵/g, 'JP')
+      .replace(/🇸🇬/g, 'SG')
+      .replace(/🇭🇰/g, 'HK')
+      .replace(/🇹🇼/g, 'TW');
+  }
 
+  function buildRegionRegex(region) {
+    const keywords = region.pattern.split('|');
+    const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(escaped.join('|'), 'i');
+  }
+
+  const originalProxies = config.proxies || [];
   if (originalProxies.length === 0) return config;
 
-  const filteredProxies = originalProxies;
-
   const REGIONS = [
-    { name: "美国节点", pattern: "美|纽约|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣克拉拉|圣何塞|西雅图|芝加哥|US|United States|SJC", icon: "United_States.png" },
-    { name: "日本节点", pattern: "日本|东京|大阪|JP|Japan", icon: "Japan.png" },
-    { name: "狮城节点", pattern: "新加坡|狮城|SG|Singapore|SIN", icon: "Singapore.png" },
-    { name: "香港节点", pattern: "港|HK|Hong Kong", icon: "Hong_Kong.png" },
-    { name: "台湾节点", pattern: "台|新北|彰化|TW|Taiwan", icon: "Taiwan.png" }
+    { name: "美国节点", pattern: "美国|美|US|USA|UnitedStates|United States|纽约|NewYork|NYC|JFK|洛杉矶|LosAngeles|LAX|旧金山|SanFrancisco|SFO|圣何塞|SanJose|SJC|西雅图|Seattle|SEA|芝加哥|Chicago|ORD|达拉斯|Dallas|DFW|硅谷|SiliconValley", icon: "United_States.png" },
+    { name: "日本节点", pattern: "日本|日|JP|JPN|Japan|东京|Tokyo|TYO|NRT|HND|大阪|Osaka|KIX", icon: "Japan.png" },
+    { name: "狮城节点", pattern: "新加坡|狮城|SG|SGP|Singapore|SIN", icon: "Singapore.png" },
+    { name: "香港节点", pattern: "香港|港|HK|HKG|HongKong|Hong Kong", icon: "Hong_Kong.png" },
+    { name: "台湾节点", pattern: "台湾|台|TW|TWN|Taiwan|台北|Taipei|TPE|新北|NewTaipei", icon: "Taiwan.png" }
   ];
+
+  const proxiesWithNorm = originalProxies.map(p => ({
+    ...p,
+    __normName: normalizeName(p.name)
+  }));
 
   const validRegions = [];
   for (const region of REGIONS) {
-    const regex = new RegExp(region.pattern);
-    if (filteredProxies.some(proxy => regex.test(proxy.name))) {
-      validRegions.push(region);
+    const regex = buildRegionRegex(region);
+    if (proxiesWithNorm.some(proxy => regex.test(proxy.__normName))) {
+      validRegions.push({ ...region, regex });
     }
   }
 
   const validRegionNames = validRegions.map(r => r.name);
 
-  // 提取机场分组
   const airportRegex = /【([^】]+)】/;
   const airportMap = new Map();
 
-  for (const proxy of filteredProxies) {
+  for (const proxy of originalProxies) {
     const match = proxy.name.match(airportRegex);
     if (match) {
       const airportName = `【${match[1]}】`;
@@ -44,61 +63,7 @@ function main(config) {
   const airportNames = Array.from(airportMap.keys());
   const proxyGroups = [];
 
-  proxyGroups.push({
-    name: "节点选择",
-    icon: `${ICON_BASE}Proxy.png`,
-    type: "select",
-    proxies: [...validRegionNames, ...airportNames, "手动切换"]
-  });
-
-  for (const region of validRegions) {
-    const regex = new RegExp(region.pattern);
-    const regionProxies = filteredProxies
-      .filter(proxy => regex.test(proxy.name))
-      .map(proxy => proxy.name);
-
-    if (regionProxies.length > 0) {
-      proxyGroups.push({
-        name: region.name,
-        icon: `${ICON_BASE}${region.icon}`,
-        type: "url-test",
-        proxies: regionProxies,
-        interval: 300,
-        tolerance: 50
-      });
-    }
-  }
-
-  proxyGroups.push({
-    name: "手动切换",
-    icon: `${ICON_BASE}Available.png`,
-    "include-all": true,
-    type: "select"
-  });
-
-  // 添加机场分组
-  for (const [airportName, proxies] of airportMap) {
-    proxyGroups.push({
-      name: airportName,
-      icon: `${ICON_BASE}Airport.png`,
-      type: "url-test",
-      proxies: proxies,
-      interval: 300,
-      tolerance: 50
-    });
-  }
-
-  proxyGroups.push({
-    name: "GLOBAL",
-    icon: `${ICON_BASE}Global.png`,
-    type: "select",
-    proxies: ["节点选择", ...validRegionNames, ...airportNames, "手动切换", "DIRECT"]
-  });
-
-  config["proxy-groups"] = proxyGroups;
-
-
-  proxyGroups.push({ name: "节点选择", icon: `${ICON_BASE}Proxy.png`, type: "select", proxies: [...validRegionNames, "手动切换"] });
+  proxyGroups.push({ name: "节点选择", icon: `${ICON_BASE}Proxy.png`, type: "select", proxies: [...validRegionNames, ...airportNames, "手动切换"] });
 
   for (const region of validRegions) {
     const regionProxies = proxiesWithNorm
@@ -111,7 +76,12 @@ function main(config) {
   }
 
   proxyGroups.push({ name: "手动切换", icon: `${ICON_BASE}Available.png`, "include-all": true, type: "select" });
-  proxyGroups.push({ name: "GLOBAL", icon: `${ICON_BASE}Global.png`, type: "select", proxies: ["节点选择", ...validRegionNames, "手动切换", "DIRECT"] });
+
+  for (const [airportName, proxies] of airportMap) {
+    proxyGroups.push({ name: airportName, icon: `${ICON_BASE}Airport.png`, type: "url-test", proxies: proxies, interval: 300, tolerance: 50 });
+  }
+
+  proxyGroups.push({ name: "GLOBAL", icon: `${ICON_BASE}Global.png`, type: "select", proxies: ["节点选择", ...validRegionNames, ...airportNames, "手动切换", "DIRECT"] });
 
   config["proxy-groups"] = proxyGroups;
 
@@ -134,7 +104,6 @@ function main(config) {
     "GEOIP,CN,DIRECT",
     "MATCH,节点选择"
   ];
-
 
   config.proxies = originalProxies;
   return config;
